@@ -1,10 +1,10 @@
 {
-  "tag_name": "v0.3.2-mugenibi.1",
-  "html_url": "https://github.com/Mugen-Ibi/zmk-studio/releases/tag/v0.3.2-mugenibi.1",
+  "tag_name": "v0.3.3-mugenibi.1",
+  "html_url": "https://github.com/Mugen-Ibi/zmk-studio/releases/tag/v0.3.3-mugenibi.1",
   "assets": [
     {
-      "name": "ZMK.Studio.Mugen-Ibi_0.3.2_x64-setup.exe",
-      "browser_download_url": "https://github.com/Mugen-Ibi/zmk-studio/releases/download/v0.3.2-mugenibi.1/ZMK.Studio.Mugen-Ibi_0.3.2_x64-setup.exe"
+      "name": "ZMK.Studio.Mugen-Ibi_0.3.3_x64-setup.exe",
+      "browser_download_url": "https://github.com/Mugen-Ibi/zmk-studio/releases/download/v0.3.3-mugenibi.1/ZMK.Studio.Mugen-Ibi_0.3.3_x64-setup.exe"
     }
   ]
 }
