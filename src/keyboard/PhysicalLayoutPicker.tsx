@@ -33,8 +33,9 @@ export const PhysicalLayoutPicker = ({
   onPhysicalLayoutClicked,
 }: PhysicalLayoutPickerProps) => {
   const selectionChanged = useCallback(
-    (e: Key) => {
-      onPhysicalLayoutClicked?.(layouts.findIndex((l) => l.name === e));
+    (e: Key | null) => {
+      const index = layouts.findIndex((l) => l.name === e);
+      if (index >= 0) onPhysicalLayoutClicked?.(index);
     },
     [layouts, onPhysicalLayoutClicked],
   );
@@ -43,7 +44,7 @@ export const PhysicalLayoutPicker = ({
     <Select
       onSelectionChange={selectionChanged}
       className="flex flex-col"
-      selectedKey={layouts[selectedPhysicalLayoutIndex].name}
+      selectedKey={layouts[selectedPhysicalLayoutIndex]?.name}
     >
       <Label className="after:content-[':'] text-sm">Layout</Label>
       <Button className="ml-2 p-1 rounded min-w-24 text-left hover:bg-base-300">
@@ -68,7 +69,7 @@ export const PhysicalLayoutPicker = ({
                   hoverZoom={false}
                   positions={l.keys.map(
                     ({ x, y, width, height, r, rx, ry }, i) => ({
-                      id: `${layouts[selectedPhysicalLayoutIndex].name}-${i}`,
+                      id: `${layouts[selectedPhysicalLayoutIndex]?.name}-${i}`,
                       x: x / 100.0,
                       y: y / 100.0,
                       width: width / 100.0,

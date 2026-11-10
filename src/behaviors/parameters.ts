@@ -1,32 +1,34 @@
 import { BehaviorParameterValueDescription } from "@zmkfirmware/zmk-studio-ts-client/behaviors";
-import { hid_usage_page_and_id_from_usage } from "../hid-usages";
-
+export function hidUsageInRange(
+  page: number,
+  id: number,
+  min = 1,
+  max = 0xffff,
+) {
+  if (id === 0 || max === 0) return false;
+  return (id >= min && id <= max) || (page === 7 && id >= 0xe0 && id <= 0xe7);
+}
 export function validateValue(
   layerIds: number[],
   value?: number,
-  values?: BehaviorParameterValueDescription[]
+  values?: BehaviorParameterValueDescription[],
 ): boolean {
-  if (value === undefined) {
-    return values === undefined || values?.length === 0 || !!values[0].nil;
-  }
-
-  const matchingValue = values?.find((v) => {
-    if (v.constant !== undefined) {
-      return v.constant == value;
-    } else if (v.range) {
-      return value >= v.range.min && value <= v.range.max;
-    } else if (v.hidUsage) {
-      const [page, id] = hid_usage_page_and_id_from_usage(value);
-      return page !== 0 && id !== 0;
-    } else if (v.layerId) {
-      return layerIds.includes(value);
-    } else if (v.nil) {
-      return value === 0;
-    } else {
-      console.error("Unknown check type!");
+  if (!values?.length) return value === undefined || value === 0;
+  if (value === undefined) return values.some((v) => v.nil);
+  if (!Number.isInteger(value) || value < 0 || value > 0xffffffff) return false;
+  return values.some((v) => {
+    if (v.constant !== undefined) return v.constant === value;
+    if (v.range) return value >= v.range.min && value <= v.range.max;
+    if (v.hidUsage) {
+      const page = (value >>> 16) & 0xff;
+      const id = value & 0xffff;
+      if (page === 7)
+        return hidUsageInRange(page, id, 4, v.hidUsage.keyboardMax);
+      if (page === 12)
+        return hidUsageInRange(page, id, 1, v.hidUsage.consumerMax);
       return false;
     }
+    if (v.layerId) return layerIds.includes(value);
+    return !!v.nil && value === 0;
   });
-
-  return !!matchingValue || (value === 0 && (!values || values.length === 0));
 }

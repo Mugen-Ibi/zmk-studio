@@ -1,20 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "enables the default permissions",
+  "description": "Listen to session-scoped native transport events",
   "windows": [
     "main"
   ],
   "permissions": [
-    "core:path:default",
-    "core:event:default",
-    "core:window:default",
-    "core:webview:default",
-    "core:app:default",
-    "core:resources:default",
-    "core:image:default",
-    "core:menu:default",
-    "core:tray:default",
-    "cli:default"
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
   ]
 }

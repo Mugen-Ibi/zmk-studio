@@ -1,38 +1,27 @@
 import { useEffect, useState } from "react";
-
-function basicSerialize<T>(value: T): string {
-  if (typeof value === "object") {
-    return JSON.stringify(value);
-  }
-  return String(value);
-}
-
 export function useLocalStorageState<T>(
   key: string,
   defaultValue: T,
-  options?: {
+  options: {
     serialize?: (value: T) => string;
-    deserialize?: (value: string) => T;
+    deserialize: (value: string) => T;
   },
 ) {
-  const reactState = useState<T>(() => {
-    const savedValue = localStorage.getItem(key);
-    if (savedValue !== null) {
-      if (options?.deserialize) {
-        return options.deserialize(savedValue);
-      }
-      return savedValue as T; // Assuming T is a string
+  const [state, setState] = useState<T>(() => {
+    try {
+      const saved = localStorage.getItem(key);
+      return saved === null ? defaultValue : options.deserialize(saved);
+    } catch {
+      return defaultValue;
     }
-    return defaultValue;
   });
-
-  const [state] = reactState;
-
+  const serialize = options.serialize;
   useEffect(() => {
-    const serializedState =
-      options?.serialize?.(state) || basicSerialize(state);
-    localStorage.setItem(key, serializedState);
-  }, [state, key, options]);
-
-  return reactState;
+    try {
+      localStorage.setItem(key, serialize ? serialize(state) : String(state));
+    } catch {
+      /* Private browsing and full storage must not block editing. */
+    }
+  }, [state, key, serialize]);
+  return [state, setState] as const;
 }

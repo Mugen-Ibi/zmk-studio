@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
-
+import { useEffect, useId, useMemo, useState } from "react";
 import {
   GetBehaviorDetailsResponse,
   BehaviorBindingParametersSet,
@@ -7,111 +6,76 @@ import {
 import { BehaviorBinding } from "@zmkfirmware/zmk-studio-ts-client/keymap";
 import { BehaviorParametersPicker } from "./BehaviorParametersPicker";
 import { validateValue } from "./parameters";
-
 export interface BehaviorBindingPickerProps {
   binding: BehaviorBinding;
   behaviors: GetBehaviorDetailsResponse[];
   layers: { id: number; name: string }[];
   onBindingChanged: (binding: BehaviorBinding) => void;
 }
-
+type Draft = { behaviorId: number; param1?: number; param2?: number };
 function validateBinding(
   metadata: BehaviorBindingParametersSet[],
   layerIds: number[],
   param1?: number,
-  param2?: number
-): boolean {
-  if (
-    (param1 === undefined || param1 === 0) &&
-    metadata.every((s) => !s.param1 || s.param1.length === 0)
-  ) {
-    return true;
-  }
-
-  let matchingSet = metadata.find((s) =>
-    validateValue(layerIds, param1, s.param1)
+  param2?: number,
+) {
+  if (metadata.length === 0) return (param1 ?? 0) === 0 && (param2 ?? 0) === 0;
+  return metadata.some(
+    (set) =>
+      validateValue(layerIds, param1, set.param1) &&
+      validateValue(layerIds, param2, set.param2),
   );
-
-  if (!matchingSet) {
-    return false;
-  }
-
-  return validateValue(layerIds, param2, matchingSet.param2);
 }
-
 export const BehaviorBindingPicker = ({
   binding,
   layers,
   behaviors,
   onBindingChanged,
 }: BehaviorBindingPickerProps) => {
-  const [behaviorId, setBehaviorId] = useState(binding.behaviorId);
-  const [param1, setParam1] = useState<number | undefined>(binding.param1);
-  const [param2, setParam2] = useState<number | undefined>(binding.param2);
-
-  const metadata = useMemo(
-    () => behaviors.find((b) => b.id == behaviorId)?.metadata,
-    [behaviorId, behaviors]
+  const [draft, setDraft] = useState<Draft>(binding);
+  const id = useId();
+  useEffect(() => setDraft(binding), [binding]);
+  const metadata = behaviors.find((b) => b.id === draft.behaviorId)?.metadata;
+  const sorted = useMemo(
+    () =>
+      [...behaviors].sort((a, b) => a.displayName.localeCompare(b.displayName)),
+    [behaviors],
   );
-
-  const sortedBehaviors = useMemo(
-    () => behaviors.sort((a, b) => a.displayName.localeCompare(b.displayName)),
-    [behaviors]
-  );
-
-  useEffect(() => {
-    if (
-      binding.behaviorId === behaviorId &&
-      binding.param1 === param1 &&
-      binding.param2 === param2
-    ) {
-      return;
+  const change = (next: Draft, normalize = false) => {
+    const sets = behaviors.find((b) => b.id === next.behaviorId)?.metadata;
+    const ids = layers.map((l) => l.id);
+    if (sets && normalize) {
+      const set = sets.find((s) => validateValue(ids, next.param1, s.param1));
+      if (!set?.param2.length || set.param2.every((v) => v.nil))
+        next.param2 = 0;
+      else if (!validateValue(ids, next.param2, set.param2))
+        next.param2 = undefined;
     }
-
-    if (!metadata) {
-      console.error(
-        "Can't find metadata for the selected behaviorId",
-        behaviorId
-      );
-      return;
-    }
-
-    if (
-      validateBinding(
-        metadata,
-        layers.map(({ id }) => id),
-        param1,
-        param2
-      )
-    ) {
+    setDraft(next);
+    if (sets && validateBinding(sets, ids, next.param1, next.param2)) {
       onBindingChanged({
-        behaviorId,
-        param1: param1 || 0,
-        param2: param2 || 0,
+        behaviorId: next.behaviorId,
+        param1: next.param1 ?? 0,
+        param2: next.param2 ?? 0,
       });
     }
-  }, [behaviorId, param1, param2]);
-
-  useEffect(() => {
-    setBehaviorId(binding.behaviorId);
-    setParam1(binding.param1);
-    setParam2(binding.param2);
-  }, [binding]);
-
+  };
   return (
     <div className="flex flex-col gap-2">
       <div>
-        <label>Behavior: </label>
+        <label htmlFor={id}>Behavior: </label>
         <select
-          value={behaviorId}
+          id={id}
+          value={draft.behaviorId}
           className="h-8 rounded"
-          onChange={(e) => {
-            setBehaviorId(parseInt(e.target.value));
-            setParam1(0);
-            setParam2(0);
-          }}
+          onChange={(e) =>
+            change(
+              { behaviorId: Number(e.target.value), param1: 0, param2: 0 },
+              true,
+            )
+          }
         >
-          {sortedBehaviors.map((b) => (
+          {sorted.map((b) => (
             <option key={b.id} value={b.id}>
               {b.displayName}
             </option>
@@ -121,11 +85,11 @@ export const BehaviorBindingPicker = ({
       {metadata && (
         <BehaviorParametersPicker
           metadata={metadata}
-          param1={param1}
-          param2={param2}
+          param1={draft.param1}
+          param2={draft.param2}
           layers={layers}
-          onParam1Changed={setParam1}
-          onParam2Changed={setParam2}
+          onParam1Changed={(param1) => change({ ...draft, param1 }, true)}
+          onParam2Changed={(param2) => change({ ...draft, param2 })}
         />
       )}
     </div>

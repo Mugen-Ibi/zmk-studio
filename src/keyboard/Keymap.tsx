@@ -5,11 +5,9 @@ import {
 } from "@zmkfirmware/zmk-studio-ts-client/keymap";
 import type { GetBehaviorDetailsResponse } from "@zmkfirmware/zmk-studio-ts-client/behaviors";
 
-import {
-  LayoutZoom,
-  PhysicalLayout as PhysicalLayoutComp,
-} from "./PhysicalLayout";
-import { HidUsageLabel } from "./HidUsageLabel";
+import { PhysicalLayout as PhysicalLayoutComp } from "./PhysicalLayout";
+import { LayoutZoom } from "./layoutZoom";
+import { bindingSummary } from "./bindingSummary";
 
 type BehaviorMap = Record<number, GetBehaviorDetailsResponse>;
 
@@ -51,9 +49,7 @@ export const Keymap = ({
 
     const binding = keymap.layers[selectedLayerIndex].bindings[i];
     const behavior = behaviors[binding.behaviorId];
-    const constantName = behavior?.metadata
-      .flatMap((set) => set.param1)
-      .find((value) => value.constant === binding.param1)?.name;
+    const summary = bindingSummary(binding, behavior, keymap.layers);
 
     return {
       id: `${keymap.layers[selectedLayerIndex].id}-${i}`,
@@ -67,10 +63,13 @@ export const Keymap = ({
       r: (k.r || 0) / 100.0,
       rx: (k.rx || 0) / 100.0,
       ry: (k.ry || 0) / 100.0,
-      children: constantName || (
-        <HidUsageLabel
-          hid_usage={keymap.layers[selectedLayerIndex].bindings[i].param1}
-        />
+      children: (
+        <span
+          className={`max-w-full px-1 pt-2 text-center leading-tight break-words ${summary.length > 4 ? "text-[10px]" : ""}`}
+          title={`${behavior?.displayName || binding.behaviorId}: ${summary}`}
+        >
+          {summary}
+        </span>
       ),
     };
   });

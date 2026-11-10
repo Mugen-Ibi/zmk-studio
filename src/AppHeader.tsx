@@ -24,12 +24,14 @@ export interface AppHeaderProps {
   onRedo?: () => Promise<void>;
   onResetSettings?: () => void | Promise<void>;
   onDisconnect?: () => void | Promise<void>;
+  busy?: boolean;
   canUndo?: boolean;
   canRedo?: boolean;
 }
 
 export const AppHeader = ({
   connectedDeviceLabel,
+  busy,
   canRedo,
   canUndo,
   onRedo,
@@ -52,20 +54,20 @@ export const AppHeader = ({
     ) {
       setShowSettingsReset(false);
     }
-  }, [lockState, showSettingsReset]);
+  }, [connectionState, lockState, showSettingsReset]);
 
   const showSettingsRef = useModalRef(showSettingsReset);
   const [unsaved, setUnsaved] = useConnectedDeviceData<boolean>(
     { keymap: { checkUnsavedChanges: true } },
-    (r) => r.keymap?.checkUnsavedChanges
+    (r) => r.keymap?.checkUnsavedChanges,
   );
 
   useSub("rpc_notification.keymap.unsavedChangesStatusChanged", (unsaved) =>
-    setUnsaved(unsaved)
+    setUnsaved(unsaved),
   );
 
   return (
-    <header className="top-0 left-0 right-0 grid grid-cols-[1fr_auto_1fr] items-center justify-between h-10 max-w-full">
+    <header className="top-0 left-0 right-0 grid grid-cols-[auto_minmax(0,1fr)_auto] sm:grid-cols-[1fr_auto_1fr] items-center justify-between h-10 shrink-0 max-w-full">
       <div className="flex px-3 items-center gap-1">
         <img src="/zmk.svg" alt="ZMK Logo" className="h-8 rounded" />
         <p>Studio</p>
@@ -99,10 +101,11 @@ export const AppHeader = ({
       </GenericModal>
       <MenuTrigger>
         <Button
-          className="text-center rac-disabled:opacity-0 hover:bg-base-300 transition-all duration-100 p-1 pl-2 rounded-lg"
+          className="text-center min-w-0 truncate rac-disabled:opacity-0 hover:bg-base-300 transition-all duration-100 p-1 pl-2 rounded-lg"
+          aria-label={connectedDeviceLabel || "Device menu"}
           isDisabled={!connectedDeviceLabel}
         >
-          {connectedDeviceLabel}
+          <span title={connectedDeviceLabel}>{connectedDeviceLabel}</span>
           <ChevronDown className="inline-block w-4" />
         </Button>
         <Popover>
@@ -126,6 +129,7 @@ export const AppHeader = ({
         {onUndo && (
           <Tooltip label="Undo">
             <Button
+              aria-label="Undo"
               className="flex items-center justify-center p-1.5 rounded enabled:hover:bg-base-300 disabled:opacity-50"
               isDisabled={!canUndo}
               onPress={onUndo}
@@ -138,6 +142,7 @@ export const AppHeader = ({
         {onRedo && (
           <Tooltip label="Redo">
             <Button
+              aria-label="Redo"
               className="flex items-center justify-center p-1.5 rounded enabled:hover:bg-base-300 disabled:opacity-50"
               isDisabled={!canRedo}
               onPress={onRedo}
@@ -148,8 +153,9 @@ export const AppHeader = ({
         )}
         <Tooltip label="Save">
           <Button
+            aria-label="Save"
             className="flex items-center justify-center p-1.5 rounded enabled:hover:bg-base-300 disabled:opacity-50"
-            isDisabled={!unsaved}
+            isDisabled={busy || !unsaved}
             onPress={onSave}
           >
             <Save className="inline-block w-4 mx-1" aria-label="Save" />
@@ -157,9 +163,10 @@ export const AppHeader = ({
         </Tooltip>
         <Tooltip label="Discard">
           <Button
+            aria-label="Discard"
             className="flex items-center justify-center p-1.5 rounded enabled:hover:bg-base-300 disabled:opacity-50"
             onPress={onDiscard}
-            isDisabled={!unsaved}
+            isDisabled={busy || !unsaved}
           >
             <Trash2 className="inline-block w-4 mx-1" aria-label="Discard" />
           </Button>

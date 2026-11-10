@@ -1,158 +1,156 @@
-use async_std::future::timeout;
-use futures::future::ready;
-use futures::{channel::mpsc::channel, FutureExt};
-use futures::{StreamExt, TryFutureExt};
-
-use std::time::Duration;
-use uuid::Uuid;
-
+use super::commands::{
+    acknowledge, finished, ActiveConnection, AvailableDevice, DataEvent, Result, Session,
+    TransportError, WriteRequest,
+};
 use bluest::{Adapter, ConnectionEvent, Device, DeviceId};
-
-use tauri::{command, AppHandle, State};
+use futures::StreamExt;
+use std::time::Duration;
+use tauri::{command, AppHandle, Emitter, State};
+use tokio::{
+    sync::{mpsc, oneshot},
+    time::{sleep, timeout, timeout_at, Instant},
+};
+use uuid::Uuid;
 
 const SVC_UUID: Uuid = Uuid::from_u128(0x00000000_0196_6107_c967_c5cfb1c2482a);
 const RPC_CHRC_UUID: Uuid = Uuid::from_u128(0x00000001_0196_6107_c967_c5cfb1c2482a);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+fn bt_error(e: impl ToString) -> TransportError {
+    TransportError::new("bluetooth", e)
+}
 
 #[command]
 pub async fn gatt_connect(
     id: String,
+    session_id: String,
     app_handle: AppHandle,
-    state: State<'_, super::commands::ActiveConnection<'_>>,
-) -> Result<bool, String> {
-    let adapter = Adapter::default().await.ok_or("Failed to access the BT adapter".to_string())?;
-
-    adapter.wait_available().await.map_err(|e| format!("Failed to wait for the BT adapter access: {}", e.message()))?;
-
-    let device_id: DeviceId = serde_json::from_str(&id).unwrap();
-    let d = adapter.open_device(&device_id).await.map_err(|e| format!("Failed to open the device: {}", e.message()))?;
-
-    if !d.is_connected().await {
-        adapter.connect_device(&d).await.map_err(|e| format!("Failed to connect to the device: {}", e.message()))?;
-    }
-
-    let service = d
-        .discover_services_with_uuid(SVC_UUID)
-        .await
-        .map_err(|e| format!("Failed to find the device services: {}", e.message()))?
-        .get(0)
-        .cloned();
-
-    if let Some(s) = service {
-        let char = s
-            .discover_characteristics_with_uuid(RPC_CHRC_UUID)
-            .await
-            .map_err(|e| format!("Failed to find the studio service characteristics: {}", e.message()))?
-            .get(0)
-            .cloned();
-
-        if let Some(c) = char {
-            let c2 = c.clone();
-            let ah1 = app_handle.clone();
-            let notify_handle = tauri::async_runtime::spawn(async move {
-                if let Ok(mut n) = c2.notify().await {
-                    use tauri::Emitter;
-
-                    while let Some(Ok(vn)) = n.next().await {
-                        ah1.emit("connection_data", vn.clone());
+    state: State<'_, ActiveConnection>,
+) -> Result<()> {
+    let _lifecycle = state.lifecycle.lock().await;
+    state.retire(None).await;
+    let (sender, mut receiver) = mpsc::channel::<WriteRequest>(5);
+    let (stop, mut stopped) = oneshot::channel();
+    let (ready, readiness) = oneshot::channel();
+    let (start, started) = oneshot::channel();
+    let worker_id = session_id.clone();
+    let task = tauri::async_runtime::spawn(async move {
+        let _ = started.await;
+        let deadline = Instant::now() + CONNECT_TIMEOUT;
+        let operation = async {
+            let adapter = timeout_at(deadline, Adapter::default())
+                .await
+                .map_err(bt_error)?
+                .ok_or_else(|| bt_error("Bluetooth adapter unavailable"))?;
+            timeout_at(deadline, adapter.wait_available())
+                .await
+                .map_err(bt_error)?
+                .map_err(bt_error)?;
+            let device_id: DeviceId = serde_json::from_str(&id).map_err(bt_error)?;
+            let device = timeout_at(deadline, adapter.open_device(&device_id))
+                .await
+                .map_err(bt_error)?
+                .map_err(bt_error)?;
+            let result = async {
+                if !timeout_at(deadline, device.is_connected()).await.map_err(bt_error)? { timeout_at(deadline, adapter.connect_device(&device)).await.map_err(bt_error)?.map_err(bt_error)?; }
+                let service = timeout_at(deadline, device.discover_services_with_uuid(SVC_UUID)).await.map_err(bt_error)?.map_err(bt_error)?
+                    .into_iter().next().ok_or_else(|| bt_error("Studio service missing"))?;
+                let characteristic = timeout_at(deadline, service.discover_characteristics_with_uuid(RPC_CHRC_UUID)).await.map_err(bt_error)?.map_err(bt_error)?
+                    .into_iter().next().ok_or_else(|| bt_error("Studio characteristic missing"))?;
+                let mut notifications = timeout_at(deadline, characteristic.notify()).await.map_err(bt_error)?.map_err(bt_error)?;
+                let mut events = timeout_at(deadline, adapter.device_connection_events(&device)).await.map_err(bt_error)?.map_err(bt_error)?;
+                let _ = ready.send(());
+                let read = async {
+                    while let Some(value) = notifications.next().await {
+                        let data = value.map_err(bt_error)?;
+                        app_handle.emit("connection_data", DataEvent { session_id: &worker_id, data: &data }).map_err(bt_error)?;
                     }
-                }
-            });
-
-            let ah2 = app_handle.clone();
-            let disconnect_handle = tauri::async_runtime::spawn(async move {
-                // Need to keep adapter from being dropped while active/connected
-                let a = adapter;
-
-                use tauri::Emitter;
-                use tauri::Manager;
-
-                if let Ok(mut events) = a.device_connection_events(&d).await {
-                    while let Some(ev) = events.next().await {
-                        if ev == ConnectionEvent::Disconnected {
-                            let state = ah2.state::<super::commands::ActiveConnection>();
-                            *state.conn.lock().await = None;
-
-                            if let Err(e) = ah2.emit("connection_disconnected", ()) {
-                                println!("ERROR RAISING! {:?}", e);
-                            }
-
-                            *state.conn.lock().await = None;
-                        }
-                    }
+                    Err(bt_error("Bluetooth notification stream ended"))
                 };
-            });
-
-            let (send, mut recv) = channel(5);
-            *state.conn.lock().await = Some(Box::new(send));
-            tauri::async_runtime::spawn(async move {
-                while let Some(data) = recv.next().await {
-                    c.write(&data).await.expect("Write uneventfully");
-                }
-
-                disconnect_handle.abort();
-                notify_handle.abort();
-            });
-
-            Ok(true)
-        } else {
-            Err("Failed to connect: Unable to locate the required studio GATT characteristic".to_string())
+                let write = async {
+                    while let Some(request) = receiver.recv().await {
+                        let result = characteristic.write(&request.data).await.map_err(bt_error);
+                        acknowledge(request, result)?;
+                    }
+                    Ok(())
+                };
+                let disconnected = async {
+                    while let Some(event) = events.next().await {
+                        if event == ConnectionEvent::Disconnected { break; }
+                    }
+                    Err(bt_error("Bluetooth disconnected"))
+                };
+                tokio::select! { r = read => r, r = write => r, r = disconnected => r, _ = &mut stopped => Ok(()) }
+            }.await;
+            // Drop notification subscription before disconnecting.
+            let _ = timeout(Duration::from_secs(2), adapter.disconnect_device(&device)).await;
+            result
+        };
+        // Setup is bounded by the shared deadline; cleanup must finish before replacement.
+        let result = operation.await;
+        finished(&app_handle, &worker_id, result).await;
+    });
+    *state.conn.lock().await = Some(Session {
+        id: session_id.clone(),
+        sender,
+        stop,
+        task,
+    });
+    let _ = start.send(());
+    match timeout(CONNECT_TIMEOUT + Duration::from_secs(3), readiness).await {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(_)) => {
+            // A setup error drops readiness. Let the worker disconnect its device.
+            state.retire(Some(&session_id)).await;
+            Err(bt_error("Bluetooth setup failed"))
         }
-    } else {
-        Err("Failed to connect: Unable to locate the required studio GATT service".to_string())
+        Err(_) => {
+            // Abort a worker stuck in OS setup; its session is never published to TS.
+            if let Some(session) = state.conn.lock().await.as_ref() {
+                session.task.abort();
+            }
+            state.retire(Some(&session_id)).await;
+            Err(bt_error("Bluetooth setup failed or timed out"))
+        }
     }
 }
 
 #[cfg(target_os = "macos")]
 async fn check_connected(adapter: &Adapter, device: &Device) -> bool {
-    if let Ok(()) = adapter.connect_device(&device).await {
-        true
-    } else {
-        false
-    }
+    adapter.connect_device(device).await.is_ok()
 }
-
 #[cfg(not(target_os = "macos"))]
 async fn check_connected(_: &Adapter, device: &Device) -> bool {
     device.is_connected().await
 }
 
-const ADAPTER_TIMEOUT: Duration = Duration::from_secs(2);
-
 #[command]
-pub async fn gatt_list_devices() -> Result<Vec<super::commands::AvailableDevice>, ()> {
-    let adapter = Adapter::default()
-        .map(|a| a.ok_or(()))
-        .and_then(|a| async {
-            timeout(ADAPTER_TIMEOUT, a.wait_available())
-                .await
-                .map_err(|_| ())
-                .map(|_| a)
-        })
-        .await;
-
-    let mut ret = vec![];
-
-    if let Ok(a) = adapter {
-        let devices = a
+pub async fn gatt_list_devices() -> Result<Vec<AvailableDevice>> {
+    timeout(Duration::from_secs(6), async {
+        let adapter = Adapter::default()
+            .await
+            .ok_or_else(|| bt_error("Bluetooth adapter unavailable"))?;
+        adapter.wait_available().await.map_err(bt_error)?;
+        let devices = adapter
             .discover_devices(&[SVC_UUID])
             .await
-            .expect("GET DEVICES!")
-            .take_until(async_std::task::sleep(Duration::from_secs(2)))
-            .filter_map(|d| ready(d.ok()));
-
+            .map_err(bt_error)?
+            .take_until(sleep(Duration::from_secs(2)));
         futures::pin_mut!(devices);
-
+        let mut result = vec![];
         while let Some(device) = devices.next().await {
-            if check_connected(&a, &device).await {
-                let label = device.name_async().await.unwrap_or("Unknown".to_string());
-                let id = serde_json::to_string(&device.id()).unwrap();
-
-                ret.push(super::commands::AvailableDevice { label, id });
-            } else {
-                println!("Device isn't connected: {:?}", device);
+            let device = device.map_err(bt_error)?;
+            if check_connected(&adapter, &device).await {
+                result.push(AvailableDevice {
+                    label: device
+                        .name_async()
+                        .await
+                        .unwrap_or_else(|_| "Unknown".to_string()),
+                    id: serde_json::to_string(&device.id()).map_err(bt_error)?,
+                });
             }
         }
-    }
-
-    Ok(ret)
+        Ok(result)
+    })
+    .await
+    .map_err(|_| bt_error("Bluetooth discovery timed out"))?
 }

@@ -1,52 +1,38 @@
-import { MutableRefObject, useEffect, useRef } from "react";
-
+import { useEffect, useRef } from "react";
 export function useModalRef(
   open: boolean,
   closeOnOutsideClick?: boolean,
-  allowCancel?: boolean
-): MutableRefObject<HTMLDialogElement | null> {
+  allowCancel?: boolean,
+) {
   const ref = useRef<HTMLDialogElement | null>(null);
-
-  let reopen = async () => {
-    // We do this in a timeout so it runs after the modal has actually closed.
-    setTimeout(() => ref.current?.showModal());
-  };
-
   useEffect(() => {
-    if (open) {
-      if (ref.current && !ref.current?.open) {
-        ref.current?.showModal();
-        if (allowCancel !== undefined && !allowCancel) {
-          ref.current?.addEventListener("cancel", reopen);
-        }
-      }
-      if (closeOnOutsideClick) {
-        const handleClickOutside = (e: MouseEvent) => {
-          const target = e.target as HTMLDialogElement | null;
-          if (!target) return;
-
-          const { top, left, width, height } = target.getBoundingClientRect();
-          const clickedInDialog =
-            top <= e.clientY &&
-            e.clientY <= top + height &&
-            left <= e.clientX &&
-            e.clientX <= left + width;
-
-          if (!clickedInDialog) {
-            target.close();
-          }
-        };
-
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => {
-          document.removeEventListener("mousedown", handleClickOutside);
-        };
-      }
-    } else {
-      ref.current?.close();
-      ref.current?.removeEventListener("cancel", reopen);
+    const dialog = ref.current;
+    if (!dialog) return;
+    if (!open) {
+      dialog.close();
+      return;
     }
-  }, [open, closeOnOutsideClick]);
-
+    if (!dialog.open) dialog.showModal();
+    const cancel = (event: Event) => {
+      if (allowCancel === false) event.preventDefault();
+    };
+    const outside = (event: MouseEvent) => {
+      if (event.target !== dialog) return;
+      const { top, left, right, bottom } = dialog.getBoundingClientRect();
+      if (
+        event.clientY < top ||
+        event.clientY > bottom ||
+        event.clientX < left ||
+        event.clientX > right
+      )
+        dialog.close();
+    };
+    dialog.addEventListener("cancel", cancel);
+    if (closeOnOutsideClick) dialog.addEventListener("click", outside);
+    return () => {
+      dialog.removeEventListener("cancel", cancel);
+      dialog.removeEventListener("click", outside);
+    };
+  }, [open, closeOnOutsideClick, allowCancel]);
   return ref;
 }

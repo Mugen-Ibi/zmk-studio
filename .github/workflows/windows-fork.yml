@@ -3,6 +3,7 @@ name: Windows fork build
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -16,16 +17,23 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
         with:
-          workspaces: './src-tauri -> target'
+          workspaces: "./src-tauri -> target"
       - run: npm ci
       - run: npm test -- --silent
-      - name: Lint changed frontend and tests
-        run: npx eslint src/behaviors/ParameterValuePicker.tsx src/behaviors/BehaviorBindingPicker.stories.ts src/keyboard/Keymap.tsx tests vitest.config.ts --ext ts,tsx --max-warnings 0
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm audit --audit-level=low
+      - run: npm run build-storybook -- --disable-telemetry
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+      - run: cargo install cargo-audit --locked --version 0.22.2
+      - run: cargo audit --file src-tauri/Cargo.lock
       - name: Build unsigned Windows x64 installer
         run: npm run tauri -- build --bundles nsis -- --locked
       - uses: actions/upload-artifact@v4

@@ -25,3 +25,5 @@ src/data
 *.sw?
 
 *storybook.log
+
+storybook-static/

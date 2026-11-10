@@ -1,22 +1,24 @@
 import Emittery from "emittery";
 import { useEffect } from "react";
-
-const emitter = new Emittery();
-
-export const usePub = () => (name: PropertyKey, data: any) =>
-  emitter.emit(name, data);
-
-export const useSub = (
-  name: PropertyKey,
-  callback: (data: any) => void | Promise<void>
+import { LockState } from "@zmkfirmware/zmk-studio-ts-client/core";
+type Events = {
+  "rpc_notification.core.lockStateChanged": LockState;
+  "rpc_notification.keymap.unsavedChangesStatusChanged": boolean;
+};
+const emitter = new Emittery<
+  Record<string, { data: unknown; signal?: AbortSignal }>
+>();
+export const publish = (name: string, data: unknown, signal?: AbortSignal) =>
+  emitter.emit(name, { data, signal });
+export const useSub = <K extends keyof Events>(
+  name: K,
+  callback: (data: Events[K]) => void | Promise<void>,
 ) => {
-  const unsub = () => emitter.off(name, callback);
-
-  // Be sure we unsub if unmounted.
-  useEffect(() => {
-    emitter.on(name, callback);
-    return () => unsub();
-  });
-
-  return unsub;
+  useEffect(
+    () =>
+      emitter.on(name, ({ data, signal }) => {
+        if (!signal?.aborted) return callback(data as Events[K]);
+      }),
+    [name, callback],
+  );
 };

@@ -1,86 +1,102 @@
-import { createContext, useMemo, useState } from "react";
-
+import { createContext, useCallback, useRef, useState } from "react";
 export type UndoCallback = () => Promise<void>;
-
 export type DoCallback = () => Promise<UndoCallback>;
 
-export function useUndoRedo(): [
-  (dc: DoCallback) => Promise<void>,
-  () => Promise<void>,
-  () => Promise<void>,
-  boolean,
-  boolean,
-  () => void
-] {
-  const [locked, setLocked] = useState<boolean>(false);
-  const [undoStack, setUndoStack] = useState<Array<[DoCallback, UndoCallback]>>(
-    []
+export function useUndoRedo() {
+  const state = useRef({
+    generation: 0,
+    undo: [] as [DoCallback, UndoCallback][],
+    redo: [] as DoCallback[],
+    pending: 0,
+    tail: Promise.resolve(),
+  });
+  const [, render] = useState(0);
+  const update = useCallback(() => render((n) => n + 1), []);
+  const enqueue = useCallback(
+    (operation: (isCurrent: () => boolean) => Promise<void>) => {
+      const s = state.current;
+      const generation = s.generation;
+      s.pending++;
+      update();
+      const isCurrent = () => s.generation === generation;
+      const result = s.tail.then(async () => {
+        if (!isCurrent()) return;
+        try {
+          await operation(isCurrent);
+        } finally {
+          if (isCurrent()) {
+            s.pending--;
+            update();
+          }
+        }
+      });
+      s.tail = result.catch(() => {});
+      return result;
+    },
+    [update],
   );
-  const [redoStack, setRedoStack] = useState<Array<DoCallback>>([]);
-
-  const canUndo = useMemo(
-    () => !locked && undoStack.length > 0,
-    [locked, undoStack]
+  const doIt = useCallback(
+    (callback: DoCallback) =>
+      enqueue(async (current) => {
+        const undo = await callback();
+        if (current()) {
+          state.current.undo.unshift([callback, undo]);
+          state.current.redo = [];
+        }
+      }),
+    [enqueue],
   );
-  const canRedo = useMemo(
-    () => !locked && redoStack.length > 0,
-    [locked, redoStack]
+  const undo = useCallback(
+    () =>
+      enqueue(async (current) => {
+        const entry = state.current.undo[0];
+        if (!entry) return;
+        await entry[1]();
+        if (current()) {
+          state.current.undo.shift();
+          state.current.redo.unshift(entry[0]);
+        }
+      }),
+    [enqueue],
   );
-
-  const doIt = async (doCb: DoCallback, preserveRedo?: boolean) => {
-    setLocked(true);
-    let undo = await doCb();
-
-    setUndoStack([[doCb, undo], ...undoStack]);
-    if (!preserveRedo) {
-      setRedoStack([]);
-    }
-    setLocked(false);
-  };
-
-  const undo = async () => {
-    if (locked) {
-      throw new Error("undo invoked when existing operation in progress");
-    }
-
-    if (undoStack.length === 0) {
-      throw new Error("undo invoked with no operations to undo");
-    }
-
-    setLocked(true);
-    let [doCb, undoCb] = undoStack[0];
-    setUndoStack(undoStack.slice(1));
-    setRedoStack([doCb, ...redoStack]);
-
-    await undoCb();
-
-    setLocked(false);
-  };
-
-  const redo = async () => {
-    if (locked) {
-      throw new Error("redo invoked when existing operation in progress");
-    }
-
-    if (redoStack.length === 0) {
-      throw new Error("redo invoked with no operations to redo");
-    }
-
-    let doCb = redoStack[0];
-
-    setRedoStack(redoStack.slice(1));
-
-    return await doIt(doCb, true);
-  };
-
-  const reset = () => {
-    setRedoStack([]);
-    setUndoStack([]);
-  };
-
-  return [doIt, undo, redo, canUndo, canRedo, reset];
+  const redo = useCallback(
+    () =>
+      enqueue(async (current) => {
+        const callback = state.current.redo[0];
+        if (!callback) return;
+        const undo = await callback();
+        if (current()) {
+          state.current.redo.shift();
+          state.current.undo.unshift([callback, undo]);
+        }
+      }),
+    [enqueue],
+  );
+  const reset = useCallback(() => {
+    const s = state.current;
+    s.generation++;
+    s.undo = [];
+    s.redo = [];
+    s.pending = 0;
+    s.tail = Promise.resolve();
+    update();
+  }, [update]);
+  const run = useCallback(
+    (operation: () => Promise<void>) => enqueue(operation),
+    [enqueue],
+  );
+  const s = state.current;
+  return [
+    doIt,
+    undo,
+    redo,
+    s.pending === 0 && s.undo.length > 0,
+    s.pending === 0 && s.redo.length > 0,
+    reset,
+    s.pending > 0,
+    run,
+  ] as const;
 }
-
 export const UndoRedoContext = createContext<
   ((dc: DoCallback) => Promise<void>) | null
 >(null);

@@ -9,6 +9,8 @@ export default defineConfig({
   // Tauri expects a fixed port, fail if that port is not available
   server: {
     strictPort: true,
+    // Rust artifacts can be locked while linking on Windows and are not web inputs.
+    watch: { ignored: ["**/src-tauri/**", "**/storybook-static/**"] },
   },
   // to access the Tauri environment variables set by the CLI with information about the current target
   envPrefix: [

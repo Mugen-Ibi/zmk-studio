@@ -1,3 +1,4 @@
+import { dropDestination } from "./reorder";
 import { Pencil, Minus, Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -32,7 +33,7 @@ interface LayerPickerProps {
   onLayerNameChanged?: (
     id: number,
     oldName: string,
-    newName: string
+    newName: string,
   ) => void | Promise<void>;
 }
 
@@ -53,7 +54,7 @@ const EditLabelModal = ({
   handleSaveNewLabel: (
     id: number,
     oldName: string,
-    newName: string | null
+    newName: string | null,
   ) => void;
 }) => {
   const ref = useModalRef(open);
@@ -73,6 +74,7 @@ const EditLabelModal = ({
       <span className="mb-3 text-lg">New Layer Name</span>
       <input
         className="p-1 border rounded border-base-content border-solid"
+        aria-label="New layer name"
         type="text"
         defaultValue={editLabelData.name}
         autoFocus
@@ -115,7 +117,7 @@ export const LayerPicker = ({
   ...props
 }: LayerPickerProps) => {
   const [editLabelData, setEditLabelData] = useState<EditLabelData | null>(
-    null
+    null,
   );
 
   const layer_items = useMemo(() => {
@@ -135,10 +137,10 @@ export const LayerPicker = ({
 
       onLayerClicked?.(layer_items.findIndex((l) => s.has(l.id)));
     },
-    [onLayerClicked, layer_items]
+    [onLayerClicked, layer_items],
   );
 
-  let { dragAndDropHooks } = useDragAndDrop({
+  const { dragAndDropHooks } = useDragAndDrop({
     renderDropIndicator(target) {
       return (
         <DropIndicator
@@ -150,9 +152,15 @@ export const LayerPicker = ({
     getItems: (keys) =>
       [...keys].map((key) => ({ "text/plain": key.toLocaleString() })),
     onReorder(e) {
-      let startIndex = layer_items.findIndex((l) => e.keys.has(l.id));
-      let endIndex = layer_items.findIndex((l) => l.id === e.target.key);
-      onLayerMoved?.(startIndex, endIndex);
+      const startIndex = layer_items.findIndex((l) => e.keys.has(l.id));
+      const endIndex = layer_items.findIndex((l) => l.id === e.target.key);
+      const destination = dropDestination(
+        startIndex,
+        endIndex,
+        e.target.dropPosition,
+      );
+      if (startIndex >= 0 && endIndex >= 0 && startIndex !== destination)
+        onLayerMoved?.(startIndex, destination);
     },
   });
 
@@ -162,7 +170,7 @@ export const LayerPicker = ({
         onLayerNameChanged?.(id, oldName, newName);
       }
     },
-    [onLayerNameChanged]
+    [onLayerNameChanged],
   );
 
   return (
@@ -173,6 +181,7 @@ export const LayerPicker = ({
           <button
             type="button"
             className="hover:text-primary-content hover:bg-primary rounded-sm"
+            aria-label="Remove layer"
             disabled={!canRemove}
             onClick={onRemoveClicked}
           >
@@ -182,6 +191,7 @@ export const LayerPicker = ({
         {onAddClicked && (
           <button
             type="button"
+            aria-label="Add layer"
             disabled={!canAdd}
             className="hover:text-primary-content ml-1 hover:bg-primary rounded-sm disabled:text-gray-500 disabled:hover:bg-base-300 disabled:cursor-not-allowed"
             onClick={onAddClicked}
@@ -219,12 +229,16 @@ export const LayerPicker = ({
             className="p-1 b-1 my-1 group grid grid-cols-[1fr_auto] items-center aria-selected:bg-primary aria-selected:text-primary-content border rounded border-transparent border-solid hover:bg-base-300"
           >
             <span>{layer_item.name}</span>
-            <Pencil
-              className="h-4 w-4 mx-1 invisible group-hover:visible"
+            <button
+              type="button"
+              aria-label={`Rename layer ${layer_item.name}`}
+              className="mx-1 opacity-0 group-hover:opacity-100 focus:opacity-100"
               onClick={() =>
                 setEditLabelData({ id: layer_item.id, name: layer_item.name })
               }
-            />
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
           </ListBoxItem>
         )}
       </ListBox>
