@@ -8,6 +8,7 @@ on:
 
 jobs:
   publish-tauri:
+    if: github.repository == 'zmkfirmware/zmk-studio'
     permissions:
       contents: write
     strategy:
@@ -115,7 +116,7 @@ jobs:
             src-tauri/target/release/bundle/**/*.msi
             src-tauri/target/release/bundle/**/*.exe
   deploy-netlify:
-    if: github.event_name == 'release'
+    if: github.repository == 'zmkfirmware/zmk-studio' && github.event_name == 'release'
     needs: publish-tauri
     runs-on: ubuntu-latest
     steps:

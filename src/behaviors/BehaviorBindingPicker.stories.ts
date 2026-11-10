@@ -1,3 +1,4 @@
+// Modified by Mugen-Ibi: add a mouse-button metadata example.
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "@storybook/test";
 import { BehaviorBindingPicker } from "./BehaviorBindingPicker";
@@ -46,5 +47,21 @@ export const Example: Story = {
         ],
       },
     ],
+  },
+};
+
+export const MouseButtons: Story = {
+  args: {
+    binding: { behaviorId: 42, param1: 0, param2: 0 },
+    behaviors: [{
+      id: 42,
+      displayName: "Mouse Key Press",
+      metadata: [{
+        param1: [1, 2, 4, 8, 16].map((constant, i) => ({
+          name: `MB${i + 1}`, constant,
+        })),
+        param2: [],
+      }],
+    }],
   },
 };

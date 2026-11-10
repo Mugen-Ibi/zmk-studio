@@ -6,10 +6,10 @@
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist/"
   },
-  "productName": "ZMK Studio",
-  "mainBinaryName": "zmk-studio",
-  "version": "0.3.1",
-  "identifier": "dev.zmk.studio",
+  "productName": "ZMK Studio Mugen-Ibi",
+  "mainBinaryName": "zmk-studio-mugen-ibi",
+  "version": "0.3.2",
+  "identifier": "io.github.mugen-ibi.zmk-studio",
   "bundle": {
     "active": true,
     "category": "Productivity",
@@ -35,12 +35,16 @@
       "providerShortName": null,
       "signingIdentity": "-"
     },
-    "resources": [],
-    "shortDescription": "",
+    "resources": {
+      "../LICENSE": "LICENSE",
+      "../NOTICE": "NOTICE"
+    },
+    "shortDescription": "Unofficial ZMK Studio fork with metadata constant improvements",
     "targets": "all",
-    "windows": {
-      "signCommand": "signtool.exe sign /v /debug /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib ..\\Microsoft.Trusted.Signing.Client\\bin\\x64\\Azure.CodeSigning.Dlib.dll /dmdf trusted-signing-metadata.json %1"
-    }
+    "windows": {},
+    "publisher": "Mugen-Ibi",
+    "license": "Apache-2.0",
+    "licenseFile": "../LICENSE"
   },
   "plugins": {
     "cli": {
@@ -69,7 +73,7 @@
         "fullscreen": false,
         "height": 600,
         "resizable": true,
-        "title": "ZMK Studio",
+        "title": "ZMK Studio \u2014 Mugen-Ibi fork",
         "width": 800
       }
     ]

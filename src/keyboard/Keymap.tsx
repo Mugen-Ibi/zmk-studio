@@ -1,3 +1,4 @@
+// Modified by Mugen-Ibi: render constant names supplied by behavior metadata.
 import {
   PhysicalLayout,
   Keymap as KeymapMsg,
@@ -48,6 +49,12 @@ export const Keymap = ({
       };
     }
 
+    const binding = keymap.layers[selectedLayerIndex].bindings[i];
+    const behavior = behaviors[binding.behaviorId];
+    const constantName = behavior?.metadata
+      .flatMap((set) => set.param1)
+      .find((value) => value.constant === binding.param1)?.name;
+
     return {
       id: `${keymap.layers[selectedLayerIndex].id}-${i}`,
       header:
@@ -60,7 +67,7 @@ export const Keymap = ({
       r: (k.r || 0) / 100.0,
       rx: (k.rx || 0) / 100.0,
       ry: (k.ry || 0) / 100.0,
-      children: (
+      children: constantName || (
         <HidUsageLabel
           hid_usage={keymap.layers[selectedLayerIndex].bindings[i].param1}
         />

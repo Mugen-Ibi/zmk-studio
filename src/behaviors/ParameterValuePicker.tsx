@@ -1,3 +1,4 @@
+// Modified by Mugen-Ibi: show unselected metadata constants explicitly.
 import { BehaviorParameterValueDescription } from "@zmkfirmware/zmk-studio-ts-client/behaviors";
 import { HidUsagePicker } from "./HidUsagePicker";
 
@@ -17,15 +18,23 @@ export const ParameterValuePicker = ({
   if (values.length == 0) {
     return <></>;
   } else if (values.every((v) => v.constant !== undefined)) {
+    const hasValue = values.some((v) => v.constant === value);
     return (
       <div>
         <select
-          value={value}
+          value={hasValue ? value : ""}
           className="h-8 rounded"
           onChange={(e) => onValueChanged(parseInt(e.target.value))}
         >
+          {!hasValue && (
+            <option value="" disabled>
+              Select a value
+            </option>
+          )}
           {values.map((v) => (
-            <option value={v.constant}>{v.name}</option>
+            <option key={v.constant} value={v.constant}>
+              {v.name}
+            </option>
           ))}
         </select>
       </div>

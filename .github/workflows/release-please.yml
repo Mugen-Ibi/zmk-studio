@@ -9,6 +9,7 @@ name: release-please
 
 jobs:
   release-please:
+    if: github.repository == 'zmkfirmware/zmk-studio'
     runs-on: ubuntu-latest
     permissions:
       contents: write

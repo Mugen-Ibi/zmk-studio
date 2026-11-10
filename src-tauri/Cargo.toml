@@ -1,10 +1,10 @@
 [package]
 name = "app"
-version = "0.3.1"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
+version = "0.3.2"
+description = "Mugen-Ibi fork of ZMK Studio with metadata constant picker improvements"
+authors = ["The ZMK Contributors", "Mugen-Ibi"]
+license = "Apache-2.0"
+repository = "https://github.com/Mugen-Ibi/zmk-studio"
 default-run = "app"
 edition = "2021"
 rust-version = "1.60"

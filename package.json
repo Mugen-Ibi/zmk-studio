@@ -1,9 +1,10 @@
 {
   "name": "zmk-studio",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "scripts": {
+    "test": "vitest run",
     "generate-data": "node scripts/generate-release-data.js",
     "dev": "npm run generate-data && vite",
     "build": "npm run generate-data && tsc && vite build",
@@ -40,6 +41,8 @@
     "@storybook/react-vite": "^8.0.10",
     "@storybook/test": "^8.0.10",
     "@tauri-apps/cli": "^2.0.0",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
     "@types/w3c-web-serial": "^1.0.6",
@@ -52,16 +55,23 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.6",
     "eslint-plugin-storybook": "^0.8.0",
+    "jsdom": "^25.0.1",
     "postcss": "^8.4.38",
     "prettier": "3.3.2",
     "run-script-os": "^1.1.6",
     "storybook": "^8.0.10",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.4.5",
-    "vite": "^5.4.8"
+    "vite": "^5.4.8",
+    "vitest": "^2.1.9"
   },
   "optionalDependencies": {
     "@esbuild/darwin-arm64": "0.23.0",
     "@rollup/rollup-darwin-arm64": "^4.18.1"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Mugen-Ibi/zmk-studio.git"
   }
 }
