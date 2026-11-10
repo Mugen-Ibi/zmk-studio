@@ -13,7 +13,10 @@
     "tauri": "tauri",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "pretest": "npm run generate-data",
+    "pretypecheck": "npm run generate-data",
+    "prebuild-storybook": "npm run generate-data"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
