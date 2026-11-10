@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.3.2"
+version = "0.3.3"
 description = "Mugen-Ibi fork of ZMK Studio with metadata constant picker improvements"
 authors = ["The ZMK Contributors", "Mugen-Ibi"]
 license = "Apache-2.0"

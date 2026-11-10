@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.3 — Mugen-Ibi fork (2026-11-10)
+
+- Isolate connection sessions and cancel timed-out RPC operations.
+- Preserve native USB/BLE data, acknowledge writes, and wait for notification readiness.
+- Serialize editing and undo/redo; retain history when operations fail.
+- Correct metadata validation, binding labels, layer operations and layout switching.
+- Improve accessibility and narrow-screen editing; show only published downloads.
+- Update dependencies and enforce repository-wide frontend/Rust checks with 67 regression tests.
+- Restore run-script-os required by the upstream client's Windows installation script.
+
 ## [0.3.1](https://github.com/zmkfirmware/zmk-studio/compare/v0.3.0...v0.3.1) (2025-01-20)
 
 

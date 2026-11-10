@@ -8,7 +8,7 @@
   },
   "productName": "ZMK Studio Mugen-Ibi",
   "mainBinaryName": "zmk-studio-mugen-ibi",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "identifier": "io.github.mugen-ibi.zmk-studio",
   "bundle": {
     "active": true,
@@ -73,7 +73,7 @@
         "fullscreen": false,
         "height": 600,
         "resizable": true,
-        "title": "ZMK Studio \u2014 Mugen-Ibi fork",
+        "title": "ZMK Studio — Mugen-Ibi fork",
         "width": 800
       }
     ]
